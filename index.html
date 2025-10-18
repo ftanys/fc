@@ -1,436 +1,266 @@
-<!doctype html>
-<html lang="zh-CN">
+<!DOCTYPE html>
+<html lang="zh">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>本地双人飞行棋（CSV棋盘）</title>
-  <style>
-    :root{--cell-size:64px;--gap:6px}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:12px;background:#f6f7f9;color:#111}
-    h1{font-size:18px;margin:6px 0}
-    .top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .controls{display:flex;gap:8px;align-items:center}
-    button{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:white;cursor:pointer}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    input[type=file]{display:block}
-    .board-wrap{margin-top:12px;display:flex;gap:12px}
-    .board{background:#ddd;padding:12px;border-radius:12px;display:inline-grid;grid-gap:var(--gap);align-content:start}
-    .cell{width:var(--cell-size);height:var(--cell-size);display:flex;flex-direction:column;justify-content:center;align-items:center;font-size:12px;border-radius:6px;position:relative;border:1px solid rgba(0,0,0,.08)}
-    .cell .idx{position:absolute;left:4px;top:4px;font-size:11px;opacity:.9}
-    .cell .content{font-size:12px;text-align:center;padding:6px;word-break:break-word}
-    .cell.arrow::after{content:"";position:absolute;right:4px;bottom:4px;width:0;height:0;border:6px solid transparent}
-    /* arrow by direction */
-    .dir-right.arrow::after{border-left-color:rgba(0,0,0,.18)}
-    .dir-down.arrow::after{border-top-color:rgba(0,0,0,.18)}
-    .dir-left.arrow::after{border-right-color:rgba(0,0,0,.18)}
-    .dir-up.arrow::after{border-bottom-color:rgba(0,0,0,.18)}
-
-    .legend{display:flex;gap:8px;align-items:center;margin-top:8px}
-    .legend .sw{width:16px;height:16px;border-radius:3px;border:1px solid #aaa}
-
-    .info{min-width:220px}
-    .players{display:flex;flex-direction:column;gap:6px}
-    .player{display:flex;align-items:center;gap:8px}
-    .piece{width:20px;height:20px;border-radius:50%;box-shadow:0 1px 0 rgba(0,0,0,.15)}
-    .log{background:#fff;border:1px solid #e0e0e0;padding:8px;border-radius:8px;height:240px;overflow:auto;font-size:13px}
-
-    .modal{position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)}
-    .modal .card{background:#fff;padding:16px;border-radius:10px;min-width:320px;max-width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)}
-    .meta{font-size:12px;color:#666;margin-top:8px}
-    .hidden{display:none}
-
-    /* players positions inside cell */
-    .pos{position:absolute;bottom:4px;left:4px;display:flex;gap:4px}
-    .pos .p{width:14px;height:14px;border-radius:50%;border:2px solid #fff}
-
-    /* colors for cell types */
-    .cell.start{background:gold}
-    .cell.end{background:gold}
-    .cell.bonus{background:#cfe8ff}
-    .cell.penalty{background:#ffd8d8}
-    .cell.normal{background:#fff}
-
-    /* small responsive */
-    @media (max-width:900px){:root{--cell-size:48px}}
-  </style>
+<meta charset="UTF-8">
+<title>本地双人飞行棋</title>
+<style>
+  body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; }
+  #board-container { flex: 1; display: flex; justify-content: center; align-items: center; }
+  #board { display: grid; border: 2px solid #000; width: 90vmin; height: 90vmin; }
+  .cell {
+    border: 1px solid #555;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    font-size: 0.8em;
+    text-align: center;
+    padding: 2px;
+  }
+  .cell span.number { position: absolute; top: 2px; left: 2px; font-size: 0.7em; }
+  .arrow { position: absolute; bottom: 2px; right: 2px; font-size: 0.8em; }
+  .player { width: 20px; height: 20px; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  #sidebar { width: 300px; border-left: 2px solid #000; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; }
+  button { margin: 5px 0; padding: 10px; font-size: 1em; cursor: pointer; }
+  #log { flex: 1; overflow-y: auto; border: 1px solid #aaa; padding: 5px; margin-top: 5px; background: #f9f9f9; }
+  #log p { margin: 2px 0; }
+</style>
 </head>
 <body>
-  <h1>本地双人飞行棋（CSV棋盘）</h1>
-  <div class="top">
-    <div class="controls">
-      <label>导入棋盘 CSV（56 行）：<input id="csvfile" type="file" accept="text/csv,text/plain" /></label>
-      <button id="rollBtn" disabled>投骰子 🎲</button>
-      <button id="skipBtn" disabled>跳过回合</button>
-      <button id="resetBtn">重置</button>
-    </div>
-    <div class="info">
-      <div class="players">
-        <div class="player"><strong id="turn">当前：-</strong></div>
-        <div class="player">骰子结果：<span id="dice">-</span></div>
-      </div>
-    </div>
+
+<div id="board-container">
+  <div id="board"></div>
+</div>
+
+<div id="sidebar">
+  <input type="file" id="csvInput" accept=".csv">
+  <button id="rollBtn" disabled>投骰子</button>
+  <button id="skipBtn" disabled>跳过回合</button>
+  <button id="resetBtn">重置</button>
+  <div>
+    <p>当前玩家: <span id="currentPlayer">-</span></p>
+    <p>骰子点数: <span id="diceResult">-</span></p>
   </div>
+  <div id="log"></div>
+</div>
 
-  <div style="margin-top:8px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-    <div class="board-wrap">
-      <div id="board" class="board"></div>
-    </div>
-    <div style="min-width:260px">
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="display:flex;gap:6px;align-items:center">
-          <div class="sw" style="background:gold"></div><span style="font-size:13px">start/end</span>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <div class="sw" style="background:#cfe8ff"></div><span style="font-size:13px">bonus</span>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <div class="sw" style="background:#ffd8d8"></div><span style="font-size:13px">penalty</span>
-        </div>
-      </div>
-      <div style="margin-top:8px">
-        <div class="log" id="log"></div>
-      </div>
-    </div>
-  </div>
+<script>
+let boardData = [];
+let cells = [];
+let boardSize = 7;
+let players = [
+  { name: '玩家1', color: 'pink', position: 0 },
+  { name: '玩家2', color: 'blue', position: 0 }
+];
+let currentPlayerIndex = 0;
+let animating = false;
 
-  <!-- modal -->
-  <div id="modal" class="modal hidden" tabindex="0">
-    <div class="card">
-      <h3 id="m-title"></h3>
-      <div id="m-detail"></div>
-      <div class="meta">类型: <span id="m-type"></span> 参数: <span id="m-param"></span></div>
-      <div style="margin-top:12px;text-align:right">
-        <button id="m-continue">继续（Enter）</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    /*
-      说明:
-      - 固定使用 7 行 x 8 列 的矩形布局，共 56 格（满足题目要求）。
-      - CSV 必须有 56 行，每行4列：内容, 详情, 类型, 参数(可选)。
-      - 类型：start, end, normal, bonus, penalty
-      - 两个玩家均从第一个遇到的 start 格开始。
-      - 玩家1 红子，玩家2 蓝子。玩家1先行。
-    */
-
-    const ROWS = 7, COLS = 8, TOTAL = ROWS*COLS; // TOTAL must be 56
-    const boardEl = document.getElementById('board');
-    const fileInput = document.getElementById('csvfile');
-    const rollBtn = document.getElementById('rollBtn');
-    const skipBtn = document.getElementById('skipBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const logEl = document.getElementById('log');
-    const turnEl = document.getElementById('turn');
-    const diceEl = document.getElementById('dice');
-    const modal = document.getElementById('modal');
-    const mTitle = document.getElementById('m-title');
-    const mDetail = document.getElementById('m-detail');
-    const mType = document.getElementById('m-type');
-    const mParam = document.getElementById('m-param');
-    const mContinue = document.getElementById('m-continue');
-
-    let cells = []; // array of {content,detail,type,param,index,row,col,dir}
-    let players = [ {name:'玩家1', color:'red', pos:null}, {name:'玩家2', color:'blue', pos:null} ];
-    let current = 0; // 0 -> player1
-    let gameLoaded = false;
-    let moving = false;
-    let modalResolve = null;
-
-    // build empty grid layout (will be filled after CSV loaded)
-    function buildGrid() {
-      boardEl.style.gridTemplateColumns = `repeat(${COLS}, ${getComputedStyle(document.documentElement).getPropertyValue('--cell-size') || '64px'})`;
-      boardEl.innerHTML = '';
-      for (let r=0;r<ROWS;r++){
-        for (let c=0;c<COLS;c++){
-          const d = document.createElement('div');
-          d.className = 'cell normal';
-          d.innerHTML = `<div class="idx"></div><div class="content"></div><div class="pos"></div>`;
-          boardEl.appendChild(d);
-        }
-      }
-    }
-
-    // generate spiral indices starting top-left going right, down, left, up
-    function generateSpiralPositions(rows, cols){
-      const grid = Array.from({length:rows},()=>Array(cols).fill(null));
-      const res = [];
-      let top=0, left=0, right=cols-1, bottom=rows-1;
-      while(left<=right && top<=bottom){
-        for(let c=left;c<=right;c++) res.push([top,c]);
-        top++;
-        for(let r=top;r<=bottom;r++) res.push([r,right]);
-        right--;
-        if(top<=bottom){
-          for(let c=right;c>=left;c--) res.push([bottom,c]);
-          bottom--;
-        }
-        if(left<=right){
-          for(let r=bottom;r>=top;r--) res.push([r,left]);
-          left++;
-        }
-      }
-      return res; // length should equal rows*cols
-    }
-
-    const spiral = generateSpiralPositions(ROWS,COLS);
-
-    function parseCSV(text){
-      // basic CSV parser: split lines, then split by comma not inside quotes
-      const lines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
-      const rows = lines.map(line=>{
-        const cols = [];
-        let cur=''; let inQ=false;
-        for(let i=0;i<line.length;i++){
-          const ch=line[i];
-          if(ch==='"') { inQ=!inQ; continue; }
-          if(ch===',' && !inQ){ cols.push(cur); cur=''; } else cur+=ch;
-        }
-        cols.push(cur);
-        return cols.map(s=>s.trim());
-      });
-      return rows;
-    }
-
-    function loadFromCSVText(text){
-      const rows = parseCSV(text);
-      if(rows.length!==TOTAL){ alert(`CSV 行数必须为 ${TOTAL} 行，当前 ${rows.length} 行`); return; }
-      cells = new Array(TOTAL);
-      for(let i=0;i<TOTAL;i++){
-        const [content, detail, type, param] = rows[i].concat(['','','','']);
-        const pos = spiral[i];
-        const index = i+1;
-        cells[i] = {content:content||'', detail:detail||'', type:(type||'normal').toLowerCase(), param: param?Number(param):0, index, row:pos[0], col:pos[1], dir:null };
-      }
-      // assign direction arrows based on next cell
-      for(let i=0;i<TOTAL;i++){
-        const cur = cells[i];
-        if(i===TOTAL-1){ cur.dir = null; } else {
-          const nx = cells[i+1];
-          if(nx.row === cur.row && nx.col === cur.col+1) cur.dir='right';
-          else if(nx.row === cur.row+1 && nx.col === cur.col) cur.dir='down';
-          else if(nx.row === cur.row && nx.col === cur.col-1) cur.dir='left';
-          else if(nx.row === cur.row-1 && nx.col === cur.col) cur.dir='up';
-          else cur.dir=null;
-        }
-      }
-
-      // map cells into grid DOM
-      const cellEls = boardEl.querySelectorAll('.cell');
-      // build mapping from (r,c) to element index
-      const gridIdx = {}; // key r,c -> el
-      let idx=0;
-      for(let r=0;r<ROWS;r++){
-        for(let c=0;c<COLS;c++){
-          gridIdx[`${r},${c}`] = idx++;
-        }
-      }
-      // clear
-      cellEls.forEach(el=>{
-        el.className='cell normal';
-        el.querySelector('.idx').textContent='';
-        el.querySelector('.content').textContent='';
-        el.querySelector('.pos').innerHTML='';
-      });
-
-      cells.forEach((cell,i)=>{
-        const el = cellEls[ gridIdx[ `${cell.row},${cell.col}` ] ];
-        el.querySelector('.idx').textContent = cell.index;
-        el.querySelector('.content').textContent = cell.content;
-        el.classList.remove('normal','start','end','bonus','penalty');
-        const t = cell.type;
-        if(t==='start') el.classList.add('start');
-        else if(t==='end') el.classList.add('end');
-        else if(t==='bonus') el.classList.add('bonus');
-        else if(t==='penalty') el.classList.add('penalty');
-        else el.classList.add('normal');
-        // arrow
-        el.classList.remove('arrow','dir-right','dir-left','dir-up','dir-down');
-        if(cell.dir){ el.classList.add('arrow'); el.classList.add('dir-'+cell.dir); }
-      });
-
-      // find first start
-      const startIdx = cells.findIndex(c=>c.type==='start');
-      if(startIdx===-1){ alert('CSV 中未找到 start 类型的格子，请至少有一个 start。'); return; }
-      players[0].pos = startIdx; players[1].pos = startIdx; // both start here
-      gameLoaded = true;
-      current = 0;
-      updatePieces();
-      logEl.innerHTML='';
-      log(`棋盘加载完毕。起始格: ${startIdx+1}`);
-      rollBtn.disabled = false; skipBtn.disabled = false;
-      updateTurnDisplay();
-    }
-
-    fileInput.addEventListener('change', ()=>{
-      const f = fileInput.files[0];
-      if(!f) return;
-      const reader = new FileReader();
-      reader.onload = e=> loadFromCSVText(e.target.result);
-      reader.readAsText(f,'utf-8');
+// CSV导入
+document.getElementById('csvInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    const lines = evt.target.result.trim().split('\n');
+    boardData = lines.map(l=>{
+      const [content, detail, type, param] = l.split(',');
+      return { content, detail, type, param: param ? parseInt(param) : 0 };
     });
+    if(boardData.length !== boardSize*boardSize) { alert('CSV必须49格'); return; }
+    buildBoard();
+    resetGame();
+  };
+  reader.readAsText(file);
+});
 
-    function updatePieces(){
-      // clear pos
-      boardEl.querySelectorAll('.cell .pos').forEach(p=>p.innerHTML='');
-      const cellEls = boardEl.querySelectorAll('.cell');
-      players.forEach((pl,pi)=>{
-        if(pl.pos==null) return;
-        const el = cellEls[ getCellElementIndexByCellIndex(pl.pos) ];
-        const pos = el.querySelector('.pos');
-        const div = document.createElement('div'); div.className='p'; div.style.background=pl.color; pos.appendChild(div);
-      });
-    }
+// 构建棋盘
+function buildBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  board.style.gridTemplateColumns = `repeat(${boardSize},1fr)`;
+  cells = [];
 
-    function getCellElementIndexByCellIndex(cellIdxZeroBased){
-      // cellIdxZeroBased corresponds to cells array index, map to DOM grid index
-      const c = cells[cellIdxZeroBased];
-      return c.row * COLS + c.col;
-    }
+  const spiralCoords = getSpiralCoords(boardSize);
 
-    function log(msg){
-      const time = new Date().toLocaleTimeString();
-      logEl.innerHTML = `<div>[${time}] ${escapeHtml(msg)}</div>` + logEl.innerHTML;
-    }
+  for(let i=0;i<boardData.length;i++){
+    const [r,c] = spiralCoords[i];
+    const cellDiv = document.createElement('div');
+    cellDiv.classList.add('cell');
+    const data = boardData[i];
+    cellDiv.dataset.index = i;
+    cellDiv.style.background = getCellColor(data.type);
+    cellDiv.style.gridRowStart = r+1;
+    cellDiv.style.gridColumnStart = c+1;
+    cellDiv.innerHTML = `<span class="number">${i+1}</span>${data.content}<span class="arrow">${getArrow(i,spiralCoords)}</span>`;
+    board.appendChild(cellDiv);
+    cells.push(cellDiv);
+  }
+}
 
-    function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// 获取螺旋坐标
+function getSpiralCoords(n){
+  let coords = Array(boardSize*boardSize);
+  let top=0,bottom=n-1,left=0,right=n-1;
+  let idx=0;
+  while(top<=bottom && left<=right){
+    for(let j=left;j<=right;j++) coords[idx++] = [top,j];
+    top++;
+    for(let i=top;i<=bottom;i++) coords[idx++] = [i,right];
+    right--;
+    if(top<=bottom){ for(let j=right;j>=left;j--) coords[idx++] = [bottom,j]; bottom--; }
+    if(left<=right){ for(let i=bottom;i>=top;i--) coords[idx++] = [i,left]; left++; }
+  }
+  return coords;
+}
 
-    function updateTurnDisplay(){
-      turnEl.textContent = `当前: ${players[current].name}`;
-    }
+// 箭头方向
+function getArrow(index,coords){
+  const pos = index;
+  if(pos<coords.length-1){
+    const [x1,y1] = coords[pos];
+    const [x2,y2] = coords[pos+1];
+    if(x2>x1) return '↓';
+    if(x2<x1) return '↑';
+    if(y2>y1) return '→';
+    if(y2<y1) return '←';
+  }
+  return '';
+}
 
-    rollBtn.addEventListener('click', async ()=>{
-      if(!gameLoaded || moving) return;
-      const roll = Math.floor(Math.random()*6)+1;
-      diceEl.textContent = roll;
-      log(`${players[current].name} 投骰子，结果 ${roll}`);
-      await movePlayer(current, roll);
-      if(!moving) { // after done
-        current = (current+1)%2;
-        updateTurnDisplay();
+function getCellColor(type){
+  switch(type){
+    case 'start': return 'yellow';
+    case 'end': return 'yellow';
+    case 'bonus': return 'green';
+    case 'penalty': return 'orange';
+    case 'wait': return 'purple';
+    default: return 'white';
+  }
+}
+
+// 重置
+function resetGame(){
+  players.forEach(p=>p.position = 0);
+  currentPlayerIndex = 0;
+  updateBoard();
+  document.getElementById('currentPlayer').textContent = players[currentPlayerIndex].name;
+  document.getElementById('diceResult').textContent = '-';
+  document.getElementById('rollBtn').disabled = false;
+  document.getElementById('skipBtn').disabled = false;
+  document.getElementById('log').innerHTML = '';
+}
+
+// 更新棋盘显示
+function updateBoard(){
+  cells.forEach(c=>{
+    c.querySelectorAll('.player').forEach(p=>p.remove());
+  });
+  players.forEach((p,i)=>{
+    const cell = cells[p.position];
+    const pDiv = document.createElement('div');
+    pDiv.classList.add('player');
+    pDiv.style.background = p.color;
+    cell.appendChild(pDiv);
+  });
+}
+
+// 日志
+function log(msg){
+  const logDiv = document.getElementById('log');
+  const p = document.createElement('p');
+  p.textContent = msg;
+  logDiv.appendChild(p);
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+// 投骰子
+document.getElementById('rollBtn').addEventListener('click',()=>{
+  if(animating) return;
+  const dice = Math.floor(Math.random()*6)+1;
+  document.getElementById('diceResult').textContent = dice;
+  movePlayer(players[currentPlayerIndex], dice);
+});
+
+// 跳过
+document.getElementById('skipBtn').addEventListener('click',()=>{
+  if(animating) return;
+  log(`${players[currentPlayerIndex].name}跳过回合`);
+  nextPlayer();
+});
+
+// 重置
+document.getElementById('resetBtn').addEventListener('click',resetGame);
+
+async function movePlayer(player, steps){
+  animating = true;
+  for(let i=0;i<steps;i++){
+    await moveOneStep(player,1);
+  }
+  await handleCell(player);
+  animating = false;
+  nextPlayer();
+}
+
+function nextPlayer(){
+  currentPlayerIndex = 1 - currentPlayerIndex;
+  document.getElementById('currentPlayer').textContent = players[currentPlayerIndex].name;
+  document.getElementById('diceResult').textContent = '-';
+}
+
+function moveOneStep(player, step){
+  return new Promise(resolve=>{
+    let target = player.position + step;
+    if(target<0) target=0;
+    if(target>=boardSize*boardSize) target = boardSize*boardSize-1;
+    player.position = target;
+    updateBoard();
+    setTimeout(resolve,400);
+  });
+}
+
+function handleCell(player){
+  return new Promise(async resolve=>{
+    let idx = player.position;
+    let cellData = boardData[idx];
+    await showCellPopup(player,cellData);
+    if(cellData.type==='bonus' && cellData.param>0){
+      log(`${player.name}触发bonus，前进${cellData.param}格`);
+      for(let i=0;i<cellData.param;i++){
+        await moveOneStep(player,1);
       }
-    });
-
-    skipBtn.addEventListener('click', ()=>{
-      if(!gameLoaded || moving) return;
-      log(`${players[current].name} 跳过本回合`);
-      current = (current+1)%2; updateTurnDisplay();
-    });
-
-    resetBtn.addEventListener('click', ()=>{
-      if(!confirm('确认重置游戏吗？（会清除当前棋盘）')) return;
-      // reset
-      fileInput.value = '';
-      buildGrid();
-      cells = [];
-      players = [ {name:'玩家1', color:'red', pos:null}, {name:'玩家2', color:'blue', pos:null} ];
-      gameLoaded=false; rollBtn.disabled=true; skipBtn.disabled=true; diceEl.textContent='-'; logEl.innerHTML=''; turnEl.textContent='当前：-';
-    });
-
-    // move with step animation
-    async function movePlayer(playerIdx, steps){
-      moving = true; rollBtn.disabled = true; skipBtn.disabled = true;
-      let p = players[playerIdx];
-      for(let s=0;s<steps;s++){
-        const target = Math.min((p.pos==null?0:p.pos)+1, cells.length-1);
-        if(p.pos==null) p.pos = 0; else p.pos = Math.min(p.pos+1, cells.length-1);
-        updatePieces();
-        await sleep(220);
-        // if reached end cell, break
-        if(cells[p.pos].type==='end'){ break; }
+      idx = player.position;
+      await showCellPopup(player,boardData[idx]);
+    } else if(cellData.type==='penalty' && cellData.param>0){
+      log(`${player.name}触发penalty，后退${cellData.param}格`);
+      for(let i=0;i<cellData.param;i++){
+        await moveOneStep(player,-1);
       }
-
-      // show landed cell modal and process chain of special cells
-      await showCellChain(playerIdx, p.pos);
-
-      // check end
-      if(cells[players[playerIdx].pos].type==='end'){
-        log(`${players[playerIdx].name} 到达终点，获胜！`);
-        alert(`${players[playerIdx].name} 获胜！`);
-        rollBtn.disabled = true; skipBtn.disabled = true; moving=false; return;
-      }
-
-      moving=false; rollBtn.disabled=false; skipBtn.disabled=false;
+      idx = player.position;
+      await showCellPopup(player,boardData[idx]);
     }
-
-    async function showCellChain(playerIdx, startPos){
-      let pos = players[playerIdx].pos;
-      // show current cell first
-      await showModalForCell(pos);
-      // if special, apply param then show new cell until non-special or no move
-      while(true){
-        const cell = cells[pos];
-        if(cell.type==='bonus' && cell.param && cell.param!==0){
-          log(`${players[playerIdx].name} 在 bonus 格（${cell.index}），前进 ${cell.param} 格`);
-          // move step by step
-          for(let k=0;k<cell.param;k++){
-            players[playerIdx].pos = Math.min(players[playerIdx].pos+1, cells.length-1);
-            updatePieces(); await sleep(180);
-          }
-          pos = players[playerIdx].pos;
-          await showModalForCell(pos);
-        } else if(cell.type==='penalty' && cell.param && cell.param!==0){
-          log(`${players[playerIdx].name} 在 penalty 格（${cell.index}），后退 ${cell.param} 格`);
-          for(let k=0;k<cell.param;k++){
-            players[playerIdx].pos = Math.max(players[playerIdx].pos-1, 0);
-            updatePieces(); await sleep(180);
-          }
-          pos = players[playerIdx].pos;
-          await showModalForCell(pos);
-        } else {
-          break;
-        }
-        // check end after each chain
-        if(cells[pos].type==='end') break;
-      }
+    if(cellData.type==='end'){
+      alert(`${player.name}胜利！游戏结束`);
+      document.getElementById('rollBtn').disabled = true;
+      document.getElementById('skipBtn').disabled = true;
     }
+    resolve();
+  });
+}
 
-    function showModalForCell(cellIndexZeroBased){
-      const cell = cells[cellIndexZeroBased];
-      return new Promise(resolve=>{
-        mTitle.textContent = cell.content || `格子 ${cell.index}`;
-        mDetail.textContent = cell.detail || '(无详情)';
-        mType.textContent = cell.type;
-        mParam.textContent = cell.param || '';
-        modal.classList.remove('hidden');
-        modal.focus();
-        modalResolve = ()=>{ modal.classList.add('hidden'); modalResolve = null; resolve(); };
-      });
-    }
+function showCellPopup(player, cellData){
+  return new Promise(resolve=>{
+    const msg = `${cellData.content}\n\n详情: ${cellData.detail}\n类型: ${cellData.type}${cellData.param ? ', 参数: '+cellData.param : ''}`;
+    alert(msg);
+    log(`${player.name}走到格子${player.position+1}: ${cellData.content}`);
+    resolve();
+  });
+}
 
-    mContinue.addEventListener('click', ()=>{ if(modalResolve) modalResolve(); });
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && modalResolve){ modalResolve(); } });
+// 回车继续快捷键
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){ e.preventDefault(); }
+});
+</script>
 
-    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-    // initial
-    buildGrid();
-    updateTurnDisplay();
-
-    // helper: if user opens HTML on github pages, they need to load a CSV. provide sample download link? We'll offer a sample CSV generator button.
-    // create a sample CSV for user to download
-    function generateSampleCSV(){
-      const lines = [];
-      for(let i=1;i<=TOTAL;i++){
-        let type='normal', content=`格 ${i}`, detail=`详细 ${i}`, param='';
-        if(i===1){ type='start'; content='Start'; detail='起点'; }
-        if(i===TOTAL){ type='end'; content='End'; detail='终点'; }
-        if(i===6||i===12){ type='bonus'; param=2; }
-        if(i===9||i===20){ type='penalty'; param=2; }
-        lines.push([content, detail, type, param].join(','));
-      }
-      return lines.join('\n');
-    }
-
-    // add sample download link
-    const sampleBtn = document.createElement('button'); sampleBtn.textContent='下载示例 CSV';
-    sampleBtn.addEventListener('click', ()=>{
-      const blob = new Blob([generateSampleCSV()],{type:'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='sample_board.csv'; a.click(); URL.revokeObjectURL(url);
-    });
-    document.querySelector('.controls').appendChild(sampleBtn);
-  </script>
 </body>
 </html>
